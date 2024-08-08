@@ -2,7 +2,7 @@
 
 Simple llvm-ir example using raylib to make a bouncing square.
 
-![tsoding](https://github.com/user-attachments/assets/1d20f11f-53d3-4390-8b33-8404ac50beb9)
+![tsoding](https://github.com/user-attachments/assets/79211f6a-0ae7-492e-bf26-04ee85303221)
 
 ### ![Watch the stream by Tsoding Daily!](https://www.youtube.com/watch?v=rzXEsactdT4)
 
@@ -27,6 +27,6 @@ move on to `game.ll` to really get hands-on with it.
 
 ## Some cool screenshots
 
-![Screenshot_2024-08-08_00-14-19](https://github.com/user-attachments/assets/dcc80151-6c3b-4a81-8922-807fcff0cb9b)
+![Screenshot_2024-08-08_00-14-19](https://github.com/user-attachments/assets/91798657-db3f-447a-8498-ee997c40f74a)
 
-![Screenshot_2024-08-08_00-09-18](https://github.com/user-attachments/assets/e7b1ae9f-a6a8-4f6b-8adb-14574e442dbd)
+![Screenshot_2024-08-08_00-09-18](https://github.com/user-attachments/assets/723fcf9e-9169-4f10-bdde-a836375c83af)
