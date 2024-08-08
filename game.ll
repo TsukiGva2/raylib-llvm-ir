@@ -2,65 +2,172 @@
 target triple = "x86_64-pc-linux-gnu"
 
 @title = constant [17 x i8] c"Hello, from LLVM\00"
+
 @width = constant i32 100
 @height = constant i32 100
 
-define void @update(i32* %x, i32* %dx, i32 %w) {
-  %vx = load i32, i32* %x
-  %vdx = load i32, i32* %dx
-  %x1 = add nsw i32 %vx, %vdx
+; win_size - size
+@x_bound = constant i32 700
+@y_bound = constant i32 500
 
-  %1 = icmp slt i32 %x1, 0
-  %2 = icmp sgt i32 %x1, %w
-  %3 = or i1 %1, %2
-  br i1 %3, label %update-dx, label %update-x
-update-dx:
-  %vdx1 = sub nuw i32 0, %vdx
-  store i32 %vdx1, i32* %dx
+; the following code (clang generated) packs the WHOLE struct into an i32
+; ( MAY need ', align 1' to be able to do this right ( __attribute__((packed, aligned(1))) )
+
+; basically red = u0xFF0000FF
+;%struct.Color = type { i32, i32, i32, i32 }
+;%color = alloca %struct.Color
+;store i32 0, i32* %color
+;%r = getelementptr %struct.Color, %struct.Color* %color, i32 0, i32 0
+;store i32 255, i32* %r
+;%g = getelementptr %struct.Color, %struct.Color* %color, i32 0, i32 1
+;store i32 0, i32* %g
+;%b = getelementptr %struct.Color, %struct.Color* %color, i32 0, i32 2
+;store i32 0, i32* %b
+;%a = getelementptr %struct.Color, %struct.Color* %color, i32 0, i32 3
+;store i32 0, i32* %a
+;%first = bitcast %struct.Color* %color to i32*
+;%red = load i32, i32* %first
+
+; bounds checking
+define void @DoBoundPos(i32* %p, i32* %dp, i32 %pos_off, i32 %size) {
+  %zero = icmp slt i32 %pos_off, 0
+  %over = icmp sgt i32 %pos_off, %size
+
+  %ok = or i1 %zero, %over
+
+  br i1 %ok, label %update_dp, label %update_p
+
+update_dp:
+  %ldp = load i32, i32* %dp
+
+  ; clever
+  %neg_dp = sub nuw i32 0, %ldp
+  store i32 %neg_dp, i32* %dp
+
   ret void
-update-x:
-  store i32 %x1, i32* %x
+
+update_p:
+  store i32 %pos_off, i32* %p
+
+  ret void
+}
+
+define void @UpdatePos(i32* %x, i32* %y, i32* %dx, i32* %dy) {
+  %posx = load i32, i32* %x
+  %posy = load i32, i32* %y
+
+  %ldx = load i32, i32* %dx
+  %ldy = load i32, i32* %dy
+
+  %posx_off = add nsw i32 %posx, %ldx
+  %posy_off = add nsw i32 %posy, %ldy
+
+  ; loading globals
+  %x_bound = load i32, i32* @x_bound
+  %y_bound = load i32, i32* @y_bound
+
+  call void
+    @DoBoundPos(
+      i32* %x,
+      i32* %dx,
+      i32  %posx_off,
+      i32  %x_bound
+  )
+
+  call void
+    @DoBoundPos(
+      i32* %y,
+      i32* %dy,
+      i32  %posy_off,
+      i32  %y_bound
+  )
+
   ret void
 }
 
 ; Function Attrs: noinline nounwind optnone uwtable
 define i32 @main() {
+
   %x = alloca i32
   %y = alloca i32
+
   %dx = alloca i32
   %dy = alloca i32
+
   store i32 200, i32* %x
   store i32 100, i32* %y
+
   store i32 1, i32* %dx
   store i32 1, i32* %dy
-  call void @InitWindow(i32 800, i32 600, i8* getelementptr inbounds ([17 x i8], [17 x i8]* @title, i64 0, i64 0))
-  br label %cond
-cond:
-  %check = call i1 @WindowShouldClose()
-  br i1 %check, label %over, label %body
-body:
+
+  br label %gameStart
+
+gameStart:
+  call void
+    @InitWindow(
+      i32 800,
+      i32 600,
+      i8* getelementptr (
+        [17 x i8], [17 x i8] * @title, i64 0, i64 0
+      )
+  )
+
+  br label %shouldClose
+  
+shouldClose:
+  %close = call i1 @WindowShouldClose()
+
+  br i1 %close, label %closeWindow, label %draw
+
+draw:
   call void @BeginDrawing()
+
   call void @ClearBackground(i32 u0xFF181818)
 
-  %vx = load i32, i32* %x
-  %vy = load i32, i32* %y
-  %vdx = load i32, i32* %dx
-  %vdy = load i32, i32* %dy
-  call void @DrawRectangle(i32 %vx, i32 %vy, i32 100, i32 100, i32 u0xFF5555FF)
-  call void @update(i32* %x, i32* %dx, i32 700)
-  call void @update(i32* %y, i32* %dy, i32 500)
+  %posx = load i32, i32* %x
+  %posy = load i32, i32* %y
+
+  ; global constants must be pointers
+  %width = load i32, i32* @width
+  %height = load i32, i32* @height
+  
+  call void
+    @DrawRectangle(
+      i32 %posx,
+      i32 %posy,
+      i32 %width,
+      i32 %height,
+      i32 u0xFF00FF00
+    )
 
   call void @EndDrawing()
-  br label %cond
-over:
+
+  ; incrementing position
+
+  call void
+    @UpdatePos(
+      i32* %x,
+      i32* %y,
+      i32* %dx,
+      i32* %dy
+  )
+
+  br label %shouldClose
+
+closeWindow:
   call void @CloseWindow()
   ret i32 0
 }
 
-declare void @InitWindow(i32 noundef, i32 noundef, i8* noundef)
+declare void @InitWindow(i32, i32, i8*)
 declare void @CloseWindow()
+
+declare void @ClearBackground(i32)
+
 declare void @BeginDrawing()
 declare void @EndDrawing()
-declare void @ClearBackground(i32)
-declare i1 @WindowShouldClose()
+
 declare void @DrawRectangle(i32, i32, i32, i32, i32)
+
+declare i1   @WindowShouldClose()
+
